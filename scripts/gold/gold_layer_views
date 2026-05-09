@@ -1,0 +1,36 @@
+/*  Creating Views for the gold layer that are ready for business decisions */
+
+/* Information about all customers  */
+create view gold.dim_customer as
+select row_number() over(order by ci.cst_id) as customer_key,
+ci.cst_id as customer_id, 
+ci.cst_key as customer_number ,
+ci.cst_firstname as firstname ,ci.cst_lastname as lastname ,
+el.CNTRY as country,
+case when ci.cst_gndr!='N/A' then ci.cst_gndr else coalesce(ca.GEN,'N/A') end as gender,
+ci.cst_marital_status as marital_status ,
+ca.BDATE as birthdate,
+ci.cst_create_date as create_date
+from silver.crm_cust_info ci 
+left join silver.erp_cust_az12 ca on ci.cst_key=ca.CID
+left join silver.erp_loc_a101 el on ci.cst_key=el.CID;
+
+/* Information on all products */
+create view gold.dim_products as 
+select row_number() over(order by prd_start_dt ,prd_id) as product_number,
+pri.prd_id as product_id , pri.prd_key as product_key , pri.prd_nm as product_name, 
+pri.prd_cost as cost , pri.cat_id as categoty_id , pc.CAT as category , pc.SUBCAT as subcategory, 
+pri.prd_line as product_line , pc.MAINTENANCE , 
+pri.prd_start_dt , pri.prd_end_dt  from silver.crm_prd_info pri
+left join silver.erp_px_cat_g1v2 pc on pri.cat_id=pc.ID
+where prd_end_dt is null;
+
+/* Information about all the sales that happened */
+
+create view gold.fact_sales as
+select s.sls_ord_num as order_number,p.product_key , c.customer_id ,
+s.sls_order_dt as order_date, s.sls_ship_dt as shipping_date, s.sls_due_dt as due_date,
+s.sls_price as price,  s.sls_quantity as quantity_sold ,s.sls_sales as total_sales
+from silver.crm_sales_details s 
+left join gold.dim_customer c on s.sls_cust_id=c.customer_id
+left join gold.dim_products p on s.sls_prd_key=p.product_key
